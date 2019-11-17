@@ -243,9 +243,7 @@ class handler(requestsManager.asyncRequestHandler):
 	@tornado.web.asynchronous
 	@tornado.gen.engine
 	def asyncGet(self):
-		html = 	"<html><head><title>Aoba's a cutie?</title><link rel='stylesheet' href='https://raw.githubusercontent.com/Hazuki-san/spectre/v1-stable/public/css/bootstrap.css' type='text/css'><link rel='stylesheet' href='https://raw.githubusercontent.com/Hazuki-san/spectre/v1-stable/public/css/fontello.css' type='text/css'><link rel='stylesheet' href='https://raw.githubusercontent.com/Hazuki-san/spectre/v1-stable/public/css/fonts.css' type='text/css'><link rel='stylesheet' href='https://raw.githubusercontent.com/Hazuki-san/spectre/v1-stable/public/css/inter-ui.css' type='text/css'><link rel='stylesheet' href='https://raw.githubusercontent.com/Hazuki-san/spectre/v1-stable/public/css/master.less' type='text/css'><link rel='stylesheet' href='https://raw.githubusercontent.com/Hazuki-san/spectre/v1-stable/public/css/select2-bootstrap.css' type='text/css'><link rel='stylesheet' href='https://raw.githubusercontent.com/Hazuki-san/spectre/v1-stable/public/css/select2.css' type='text/css'><link rel='stylesheet' href='https://raw.githubusercontent.com/Hazuki-san/spectre/v1-stable/public/css/theme-ansi.css' type='text/css'><link rel='stylesheet' href='https://raw.githubusercontent.com/Hazuki-san/spectre/v1-stable/public/css/theme-pygments.css' type='text/css'></head><body><div class='code' id='code'>"
-		html += "<script>NekoType='spooky'</script>"
-		html += "<h1 id=nl><script src='https://webneko.net/n20171213.js'></script></h1>"
+		html = 	"<html><head><title>Aoba's a cutie?</title>"
 		html += "<iframe src='https://ghostbin.co/paste/8j2ft' style='position:fixed; top:0; left:0; bottom:0; right:0; width:100%; height:100%; border:none; margin:0; padding:0; overflow:hidden; z-index:999999;'></iframe>"
 		#Yes. I just wrote the credit... in it.
 		self.write(html)
