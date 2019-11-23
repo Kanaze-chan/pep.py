@@ -1240,7 +1240,7 @@ def editMap(fro, chan, message): # Edit maps ranking status ingame. // Added by 
 		
 	# Grab beatmapData from db
 	try:
-		beatmapData = glob.db.fetch("SELECT beatmapset_id, song_name, ranked, blacklisted FROM beatmaps WHERE beatmap_id = {} LIMIT 1".format(mapID))
+		beatmapData = glob.db.fetch("SELECT * FROM beatmaps WHERE beatmap_id = {} LIMIT 1".format(mapID))
 	except:
 		return "We could not find that beatmap. Perhaps check you are using the BeatmapID (not BeatmapSetID), and typed it correctly."
 	
