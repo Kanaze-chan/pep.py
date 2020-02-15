@@ -82,6 +82,9 @@ class haxException(Exception):
 class forceUpdateException(Exception):
 	pass
 
+class loginCheatClientsException(Exception):
+	pass
+
 class loginLockedException(Exception):
 	pass
 

@@ -27,6 +27,13 @@ def loginLocked():
 def loginError():
 	return packetHelper.buildPacket(packetIDs.server_userID, [[-5, dataTypes.SINT32]])
 
+def loginCheats():
+	message = "You better quit cheating! >_< ~Aoba"
+	packets = packetHelper.buildPacket(packetIDs.server_userID, [[-1, dataTypes.SINT32]])
+	packets += packetHelper.buildPacket(0x69, [[message, dataTypes.STRING]])
+	packets += notification("Please... don't login with cheats client... Play on cheating server instead of cheating on our server. Thank you.")
+	return packets
+
 def needSupporter():
 	return packetHelper.buildPacket(packetIDs.server_userID, [[-6, dataTypes.SINT32]])
 
@@ -86,17 +93,14 @@ def userPanel(userID, force = False):
 	# Get user data
 	username = userToken.username
 	# Custom Timezone
-	if userID in (1000, 1055, 1114):
+	if userID in (1000, 1106):
 		timezone = 24+9
 	else:
 		timezone = 24+userToken.timeOffset
 	# Custom Countries for Users
 	# 111 = Japan
-	# 36 = Belarus
-	if userID in (1000, 1055, 1114):
+	if userID in (1000, 1106):
 		country = 111
-	elif userID == 1209:
-		country = 36
 	else:
 		country = userToken.country
 	gameRank = userToken.gameRank
@@ -111,11 +115,8 @@ def userPanel(userID, force = False):
 	# 1000 = Aoba's User ID
 	elif userID == 1000:
 		userRank |= userRanks.PEPPY
-	# 1000 = peppy's User ID
-	elif userID == 1114:
+	elif userID == 1106:
 		userRank |= userRanks.PEPPY
-	elif userID == 1055:
-		userRank |= userRanks.MOD
 	elif userUtils.isInPrivilegeGroup(userID, "developer"):
 		userRank |= userRanks.ADMIN
 	elif userUtils.isInPrivilegeGroup(userID, "chat mod"):

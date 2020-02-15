@@ -75,6 +75,8 @@ class config:
 			parsedConfig.get("discord", "enable")
 			parsedConfig.get("discord", "boturl")
 			parsedConfig.get("discord", "devgroup")
+			parsedConfig.get("discord", "ranked")
+			parsedConfig.get("discord", "announcement")
 
 			parsedConfig.get("datadog", "enable")
 			parsedConfig.get("datadog", "apikey")
@@ -86,6 +88,8 @@ class config:
 
 			parsedConfig.get("localize", "enable")
 			parsedConfig.get("localize", "ipapiurl")
+
+			parsedConfig.get("custom", "config")
 			return True
 		except configparser.Error:
 			return False
@@ -119,12 +123,12 @@ class config:
 		self.config.set("server", "gzip", "1")
 		self.config.set("server", "gziplevel", "6")
 		self.config.set("server", "cikey", "changeme")
-		self.config.set("server", "letsapiurl", "http://.../letsapi")
+		self.config.set("server", "letsapiurl", "http://127.0.0.1:5002/letsapi")
 		self.config.set("server", "deltaurl", "delta.ppy.sh")
 		self.config.set("server", "publicdelta", "0")
 
 		self.config.add_section("cheesegull")
-		self.config.set("cheesegull", "apiurl", "http://cheesegu.ll/api")
+		self.config.set("cheesegull", "apiurl", "https://storage.ainu.pw/api")
 		self.config.set("cheesegull", "apikey", "")
 
 		self.config.add_section("debug")
@@ -141,6 +145,8 @@ class config:
 		self.config.set("discord", "enable", "0")
 		self.config.set("discord", "boturl", "")
 		self.config.set("discord", "devgroup", "")
+		self.config.set("discord", "ranked", "")
+		self.config.set("discord", "announcement", "")
 
 		self.config.add_section("datadog")
 		self.config.set("datadog", "enable", "0")
@@ -155,6 +161,9 @@ class config:
 		self.config.add_section("localize")
 		self.config.set("localize", "enable", "1")
 		self.config.set("localize", "ipapiurl", "http://ip.zxq.co")
+
+		self.config.add_section("custom")
+		self.config.set("custom", "config", "common/config.json")
 
 		# Write ini to file and close
 		self.config.write(f)
