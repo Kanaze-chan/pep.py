@@ -14,6 +14,7 @@ from constants import exceptions, slotStatuses, matchModModes, matchTeams, match
 from common.constants import gameModes
 from common.constants import privileges
 from constants import serverPackets
+from helpers import aobaHelper
 from helpers import systemHelper
 from objects import fokabot
 from objects import glob
@@ -72,13 +73,13 @@ def instantRestart(fro, chan, message):
 def faq(fro, chan, message):
 	# TODO: Unhardcode this
 	messages = {
-		"rules": "Please make sure to check (osu!thailand's rules)[https://bigtu.vip/doc/rules].",
+		"rules": "Please make sure to check (osu!thailand's rules)[https://ainu.pw/doc/rules].",
 		"swearing": "Please don't abuse swearing",
 		"spam": "Please don't spam",
 		"offend": "Please don't offend other players",
 		"github": "(osu!Ainu's Github page!)[https://github.com/osuthailand]",
-		"discord": "(Join Ainu Discord!)[https://discord.gg/cnaDpVY]",
-		"changelog": "Check the (changelog)[https://bigtu.vip/changelog] !",
+		"discord": "(Join Ainu Discord!)[https://discord.gg/Qp3WQU8]",
+		"changelog": "Check the (changelog)[https://ainu.pw/changelog] !",
 		"english": "Please keep this channel in english.",
 		"topic": "Can you please drop the topic and talk about something else?",
 		"lines": "Please try to keep your sentences on a single line to avoid getting silenced."
@@ -559,8 +560,8 @@ def tillerinoMods(fro, chan, message):
 		modsList = [message[0][i:i+2].upper() for i in range(0, len(message[0]), 2)]
 		modsEnum = 0
 		for i in modsList:
-			if i not in ["NO", "NF", "EZ", "HD", "HR", "DT", "HT", "NC", "FL", "SO"]:
-				return "Invalid mods. Allowed mods: NO, NF, EZ, HD, HR, DT, HT, NC, FL, SO. Do not use spaces for multiple mods."
+			if i not in ["NO", "NF", "EZ", "HD", "HR", "DT", "HT", "NC", "FL", "SO", "RX"]:
+				return "Invalid mods. Allowed mods: NO, NF, EZ, HD, HR, DT, HT, NC, FL, SO, RX. Do not use spaces for multiple mods."
 			if i == "NO":
 				modsEnum = 0
 				break
@@ -582,6 +583,8 @@ def tillerinoMods(fro, chan, message):
 				modsEnum += mods.FLASHLIGHT
 			elif i == "SO":
 				modsEnum += mods.SPUNOUT
+			elif i == "RX":
+				modsEnum += mods.RELAX
 
 		# Set mods
 		token.tillerino[1] = modsEnum
@@ -685,6 +688,22 @@ def tillerinoLast(fro, chan, message):
 	except Exception as a:
 		log.error(a)
 		return False
+
+
+def getBeatmapRequest(fro, chan, message): # Grab a random beatmap request. TODO: Add gamemode handling to this and !request
+	
+	request = glob.db.fetch("SELECT * FROM rank_requests LIMIT 1;")
+	if request is not None:
+		username = userUtils.getUsername(request['userid'])
+		mapData = glob.db.fetch("SELECT song_name, ranked FROM beatmaps WHERE beatmap_id = {} ORDER BY difficulty_std DESC LIMIT 1;".format(request['bid']))
+		glob.db.execute("DELETE FROM rank_requests WHERE id = {};".format(request['id']))
+		return "[https://ainu.pw/u/{userID} {username}] nominated beatmap: [https://osu.ppy.sh/b/{beatmapID} {songName}] for status change. {AinuBeatmapLink}The request has been deleted, so please decide it's status.".format(userID=request['userid'], username=username, beatmapID=request['bid'], songName=mapData['song_name'], AinuBeatmapLink='[https://ainu.pw/b/{} Ainu beatmap Link]. '.format(request['bid']))
+	else:
+		return "All nominations have been checked. Thank you for your hard work! :)"
+	
+	return "The beatmap ranking system has been reworked."
+
+
 
 def mm00(fro, chan, message):
 	random.seed()
@@ -826,6 +845,36 @@ def getSpectatorHostUserIDFromChannel(chan):
 	return userID
 
 def multiplayer(fro, chan, message):
+	def mpListRefer():
+		_match = glob.matches.matches[getMatchIDFromChannel(chan)]
+		return str(_match.refers)
+
+	def mpAddRefer():
+		if len(message) < 2:
+			raise exceptions.invalidArgumentsException("Wrong syntax: !mp addref <user>")
+		_match = glob.matches.matches[getMatchIDFromChannel(chan)]
+		username = message[1].strip()
+		if not username:
+			raise exceptions.invalidArgumentsException("Please provide a username")
+		userID = userUtils.getIDSafe(username)
+		if userID is None:
+			raise exceptions.userNotFoundException("No such user")
+		_match.addRefer(userID)
+		return "Added {} to refers".format(username)
+
+	def mpRemoveRefer():
+		if len(message) < 2:
+			raise exceptions.invalidArgumentsException("Wrong syntax: !mp rmref <user>")
+		_match = glob.matches.matches[getMatchIDFromChannel(chan)]
+		username = message[1].strip()
+		if not username:
+			raise exceptions.invalidArgumentsException("Please provide a username")
+		userID = userUtils.getIDSafe(username)
+		if userID is None:
+			raise exceptions.userNotFoundException("No such user")
+		_match.removeRefer(userID)
+		return "Removed {} from refers".format(username)
+
 	def mpMake():
 		if len(message) < 2:
 			raise exceptions.invalidArgumentsException("Wrong syntax: !mp make <name>")
@@ -1151,6 +1200,9 @@ def multiplayer(fro, chan, message):
 
 	try:
 		subcommands = {
+			"listref": mpListRefer,
+			"addref": mpAddRefer,
+			"rmref": mpRemoveRefer,
 			"make": mpMake,
 			"close": mpClose,
 			"join": mpJoin,
@@ -1220,88 +1272,155 @@ def rtx(fro, chan, message):
 	userToken.enqueue(serverPackets.rtx(message))
 	return ":ok_hand:"
 	
-def editMap(fro, chan, message): # Edit maps ranking status ingame. // Added by cmyui and edited by Aoba
-	messages = [m.lower() for m in message]
+def editMap(fro, chan, message): # Using Atoka's editMap with Aoba's edit
+	# Put the gathered values into variables to be used later
+	messages = [m.lower() for m in message]  #!map rank set [something]
 	rankType = message[0]
 	mapType = message[1]
 	mapID = message[2]
-	
-	# Get persons username & ID
+
+	# Get persons userID, privileges, and token
 	userID = userUtils.getID(fro)
+	privileges = userUtils.getPrivileges(userID)
+	token = glob.tokens.getTokenFromUserID(userID)
 	name = userUtils.getUsername(userID)
-	
-	# What do I do here?
-	if rankType == 'rank':
-		rankTypeID = 2
-		freezeStatus = 1
-	elif rankType == 'unrank':
-		rankTypeID = 0
-		freezeStatus = 0
-		
+
+	# Only allow users to request maps in #admin channel or PMs with AC. Heavily reduced spam smh
+	if chan.startswith('#') and chan != '#admin' and not privileges & 8388608:
+		return "Map ranking is not permitted in regular channels, please do so in PMs with AC (or #admin if administrator)."
+
 	# Grab beatmapData from db
 	try:
-		beatmapData = glob.db.fetch("SELECT * FROM beatmaps WHERE beatmap_id = {} LIMIT 1".format(mapID))
+		beatmapData = glob.db.fetch("SELECT beatmapset_id, song_name, ranked FROM beatmaps WHERE beatmap_id = {} LIMIT 1".format(mapID))
 	except:
 		return "We could not find that beatmap. Perhaps check you are using the BeatmapID (not BeatmapSetID), and typed it correctly."
-	
-	if mapType == 'set':
-		glob.db.execute(
-			"UPDATE beatmaps SET ranked = {}, ranked_status_freezed = {} WHERE beatmapset_id = {} LIMIT 100".format(
-				rankTypeID, freezeStatus, beatmapData["beatmapset_id"]))
-		if freezeStatus == 1:
-			glob.db.execute("""UPDATE scores s JOIN (SELECT userid, MAX(score) maxscore FROM scores JOIN beatmaps ON scores.beatmap_md5 = beatmaps.beatmap_md5 WHERE beatmaps.beatmap_md5 = (SELECT beatmap_md5 FROM beatmaps
-					WHERE beatmapset_id = {} LIMIT 1) GROUP BY userid) s2 ON s.score = s2.maxscore AND s.userid = s2.userid SET completed = 3""".format(
-				beatmapData["beatmapset_id"]))
-		typeBM = 'set'
-	elif mapType == 'map':
-		glob.db.execute(
-			"UPDATE beatmaps SET ranked = {}, ranked_status_freezed = {} WHERE beatmap_id = {} LIMIT 1".format(
-				rankTypeID, freezeStatus, mapID))
-		if freezeStatus == 1:
-			glob.db.execute("""UPDATE scores s JOIN (SELECT userid, MAX(score) maxscore FROM scores JOIN beatmaps ON scores.beatmap_md5 = beatmaps.beatmap_md5 WHERE beatmaps.beatmap_md5 = (SELECT beatmap_md5 FROM beatmaps
-					WHERE beatmap_id = {} LIMIT 1) GROUP BY userid) s2 ON s.score = s2.maxscore AND s.userid = s2.userid SET completed = 3""".format(
-				beatmapData["beatmap_id"]))
-		typeBM = 'beatmap'
-	else:
-		return "Please specify whether it is a set/map. eg: '!map unrank/rank/love set/map 123456'"
-	
-	# Announce that YOOOOOOO THIS MAP IS RANKED!!!
-	if rankType == "rank":
-		log.rap(userID, "has {}ed beatmap ({}): {} ({}).".format(rankType, mapType, beatmapData["song_name"], mapID),
-				True)
-		if mapType == 'set':
-			msg = "{} has {}ed beatmap set: [https://osu.ppy.sh/s/{} {}]".format(name, rankType,
-																				beatmapData["beatmapset_id"],
-																				beatmapData["song_name"])
-		else:
-			msg = "{} has {}ed beatmap: [https://osu.ppy.sh/b/{} {}]".format(name, rankType, mapID,
-																			beatmapData["song_name"])
-		glob.db.execute(
-			"UPDATE scores s JOIN (SELECT userid, MAX(score) maxscore FROM scores JOIN beatmaps ON scores.beatmap_md5 = beatmaps.beatmap_md5 WHERE beatmaps.beatmap_md5 = (SELECT beatmap_md5 FROM beatmaps WHERE beatmap_id = {} LIMIT 1) GROUP BY userid) s2 ON s.score = s2.maxscore AND s.userid = s2.userid SET completed = 2".format(
-				beatmapData["beatmap_id"]))
-	else:
-		log.rap(userID, "has {}ed beatmap ({}): {} ({}).".format(rankType, mapType, beatmapData["song_name"], mapID),
-				True)
-		if mapType == 'set':
-			msg = "{} has {}ed beatmap set: [https://osu.ppy.sh/s/{} {}]".format(name, rankType,
-																				beatmapData["beatmapset_id"],
-																				beatmapData["song_name"])
-		else:
-			msg = "{} has {}ed beatmap: [https://osu.ppy.sh/b/{} {}]".format(name, rankType, mapID,
-																			beatmapData["song_name"])
 
-			glob.db.execute(
-				"UPDATE scores s JOIN (SELECT userid, MAX(score) maxscore FROM scores JOIN beatmaps ON scores.beatmap_md5 = beatmaps.beatmap_md5 WHERE beatmaps.beatmap_md5 = (SELECT beatmap_md5 FROM beatmaps WHERE beatmap_id = {} LIMIT 1) GROUP BY userid) s2 ON s.score = s2.maxscore AND s.userid = s2.userid SET completed = 2".format(
-					beatmapData["beatmap_id"]))
+	if 's' in mapType.lower():
+		mapType = 'set'
+	elif 'd' in mapType.lower() or 'm' in mapType.lower():
+		mapType = 'map'
+	else:
+		return "Please specify whether your request is a single difficulty, or a full set (map/set). Example: '!map unrank/rank/love set/map 256123 mania'."
+
+	# User has AdminManageBeatmaps perm
+	if privileges & 256:
+
+		# Figure out which ranked status we're requesting to
+		if 'r' in rankType.lower() and 'u' not in rankType.lower():
+			rankType = 'rank'
+			rankTypeID = 2
+			freezeStatus = 1
+		elif 'l' in rankType.lower():
+			rankType = 'love'
+			rankTypeID = 5
+			freezeStatus = 2
+		elif 'u' in rankType.lower() or 'g' in rankType.lower():
+			rankType = 'unrank'
+			rankTypeID = 0
+			freezeStatus = 0
+		else:
+			return "Please enter a valid ranked status (rank, love, unrank)."
 		
-	chat.sendMessage(glob.BOT_NAME, "#ranked", msg)
-	return msg
+		if rankType == "love":
+			status = "loved"
+		elif rankType == "rank":
+			status = "ranked"
+		else:
+			status = "unranked"
+		
+		if beatmapData['ranked'] == rankTypeID:
+			return "This map is already {}".format(status)
+
+		if mapType == 'set':
+			numDiffs = glob.db.fetch("SELECT COUNT(id) FROM beatmaps WHERE beatmapset_id = {}".format(beatmapData["beatmapset_id"]))
+			glob.db.execute("UPDATE beatmaps SET ranked = {}, ranked_status_freezed = {}, rankedby = {} WHERE beatmapset_id = {} LIMIT {}".format(rankTypeID, freezeStatus, userID, beatmapData["beatmapset_id"], numDiffs["COUNT(id)"]))
+		else:
+			glob.db.execute("UPDATE beatmaps SET ranked = {}, ranked_status_freezed = {}, rankedby = {} WHERE beatmap_id = {} LIMIT 1".format(rankTypeID, freezeStatus, userID, mapID ))
+
+		# Announce / Log to admin panel logs when ranked status is changed
+		log.rap(userID, "has {} beatmap ({}): {} ({})".format(status, mapType, beatmapData["song_name"], mapID), True)
+		if mapType.lower() == 'set':
+			msg = "{} has {} beatmap set: [https://osu.ppy.sh/s/{} {}]".format(fro, status, beatmapData["beatmapset_id"], beatmapData["song_name"])
+		else:
+			msg = "{} has {} beatmap: [https://osu.ppy.sh/s/{} {}]".format(fro, status, mapID, beatmapData["song_name"])
+
+		chat.sendMessage(glob.BOT_NAME, "#announce", msg)
+		
+		if mapType == "set":
+			webhookdesp = "{} (set) has been {} by {}".format(beatmapData["song_name"], status, name)
+		else:
+			webhookdesp = "{} has been {} by {}".format(beatmapData["song_name"], status, name)
+
+		webhook = aobaHelper.Webhook(glob.conf.config["discord"]["ranked"], color=0xadd8e6, footer="This beatmap was {} on osu!Ainu".format(status))
+		webhook.set_author(name=name, icon='https://a.ainu.pw/{}'.format(str(userID)), url="https://ainu.pw/u/{}".format(str(userID)))
+		webhook.set_title(title="New {} map!".format(status), url='https://osu.ppy.sh/s/{}'.format(str(beatmapData["beatmapset_id"])))
+		webhook.set_desc(webhookdesp)
+		webhook.set_image("https://assets.ppy.sh/beatmaps/{}/covers/cover.jpg".format(str(beatmapData["beatmapset_id"])))
+		webhook.post()
+		return msg
 
 def postAnnouncement(fro, chan, message): # Post to #announce ingame
 	announcement = ' '.join(message[0:])
 	chat.sendMessage(glob.BOT_NAME, "#announce", announcement)
+	userID = userUtils.getID(fro)
+	name = userUtils.getUsername(userID)
+
+	webhook = aobaHelper.Webhook(glob.conf.config["discord"]["announcement"], color=0xadd8e6, footer="This announcement was posted in-game")
+	webhook.set_author(name=name, icon='https://a.ainu.pw/{}'.format(str(userID)), url="https://ainu.pw/u/{}".format(str(userID)))
+	webhook.set_title(title="=-= ANNOUNCEMENT =-=")
+	webhook.set_desc(announcement)
+	webhook.post()
+
 	return "Announcement successfully sent."
+
+def usePPBoard(fro, chan, message):
+	messages = [m.lower() for m in message]
+	relax = message[0]
+
+	userID = userUtils.getID(fro)
+
+	if 'x' in relax:
+		rx = True
+	else:
+		rx = False
+
+	# Set PPBoard value in user_stats table
+	userUtils.setPPBoard(userID, rx)
+	return "You're using PPBoard in {rx}.".format(rx='relax' if rx else 'vanilla')
+
+def useScoreBoard(fro, chan, message):
+	messages = [m.lower() for m in message]
+	relax = message[0]
+
+	userID = userUtils.getID(fro)
 	
+	if 'x' in relax:
+		rx = True
+	else:
+		rx = False
+
+	# Set PPBoard value in user_stats table
+	userUtils.setScoreBoard(userID, rx)
+	return "You're using Scoreboard in {rx}.".format(rx='relax' if rx else 'vanilla')
+
+def whitelistUserPPLimit(fro, chan, message):
+	messages = [m.lower() for m in message]
+	target = message[0]
+	relax = message[1]
+
+	userID = userUtils.getID(target)
+
+	if userID == 0:
+		return "That user does not exist."
+
+	if 'x' in relax:
+		rx = True
+	else:
+		rx = False
+
+	userUtils.whitelistUserPPLimit(userID, rx)
+	return "{user} has been whitelisted from autorestrictions on {rx}.".format(user=target, rx='relax' if rx else 'vanilla')
+
 def bloodcat(fro, chan, message):
 	try:
 		matchID = getMatchIDFromChannel(chan)
@@ -1387,7 +1506,20 @@ commands = [
 		"callback": report
 	}, {
 		"trigger": "!help",
-		"response": "Click (here)[https://bigtu.vip/index.php?p=16&id=4] for full command list"
+		"response": "Click (here)[https://ainu.pw/index.php?p=16&id=4] for full command list"
+	}, {
+		"trigger": "!ppboard",
+		"syntax": "<relax/vanilla>",
+		"callback": usePPBoard
+	}, {
+		"trigger": "!scoreboard",
+		"syntax": "<relax/vanilla>",
+		"callback": useScoreBoard
+	}, {
+		"trigger": "!whitelist",
+		"privileges": privileges.ADMIN_BAN_USERS,
+		"syntax": "<target> <relax/vanilla>",
+		"callback": whitelistUserPPLimit
 	}, {
 		"trigger": "!announce",
 		"syntax": "<announcement>",

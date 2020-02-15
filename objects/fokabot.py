@@ -54,10 +54,18 @@ def fokabotResponse(fro, chan, message):
 			# message has triggered a command
 
 			# Make sure the user has right permissions
+			_userId = userUtils.getID(fro)
 			if i["privileges"] is not None:
-				# Rank = x
-				if userUtils.getPrivileges(userUtils.getID(fro)) & i["privileges"] == 0:
-					return False
+				if userUtils.getPrivileges(_userId) & i["privileges"] == 0:
+					if i["trigger"] == "!mp":
+						try:
+							refers = glob.matches.matches[fokabotCommands.getMatchIDFromChannel(chan)].refers
+							if not _userId in refers:
+								return False
+						except:
+							return False
+					else:
+						return False
 
 			# Check argument number
 			message = message.split(" ")

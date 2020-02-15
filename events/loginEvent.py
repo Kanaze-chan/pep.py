@@ -7,9 +7,11 @@ from common.log import logUtils as log
 from common.ripple import userUtils
 from constants import exceptions
 from constants import serverPackets
+from helpers import aobaHelper
 from helpers import chatHelper as chat
 from helpers import countryHelper
 from helpers import locationHelper
+from helpers import kotrikhelper
 from objects import glob
 
 
@@ -100,6 +102,9 @@ def handle(tornadoRequest):
 		# Log user IP
 		userUtils.logIP(userID, requestIP)
 
+		# Log user osuver
+		kotrikhelper.setUserLastOsuVer(userID, osuVersion)
+
 		# Delete old tokens for that user and generate a new one
 		isTournament = "tourney" in osuVersion
 		if not isTournament:
@@ -157,6 +162,41 @@ def handle(tornadoRequest):
 			else:
 				# We are mod/admin, send warning notification and continue
 				responseToken.enqueue(serverPackets.notification("Bancho is in maintenance mode. Only mods/admins have full access to the server.\nType !system maintenance off in chat to turn off maintenance mode."))
+
+		# BAN CUSTOM CHEAT CLIENTS
+		# 0Ainu = First Ainu build
+		# b20190326.2 = Ainu build 2 (MPGH PAGE 10)
+		# b20190401.22f56c084ba339eefd9c7ca4335e246f80 = Ainu Aoba's Birthday Build
+		# b20191223.3 = Unknown Ainu build? (Taken from most users osuver in cookiezi.pw)
+		# b20190226.2 = hqOsu (hq-af)
+		if glob.conf.extra["mode"]["anticheat"]:
+			# Ainu Client 2020 update
+			if tornadoRequest.request.headers.get("ainu") == "happy":
+				log.info("Account {} tried to use Ainu Client 2020!".format(userID))
+				if userUtils.isRestricted(userID):
+					responseToken.enqueue(serverPackets.notification("You're banned because you're currently using Ainu Client... Happy New Year 2020 and Enjoy your restriction :)"))
+				else:
+					glob.tokens.deleteToken(userID)
+					userUtils.restrict(userID)
+					raise exceptions.loginCheatClientsException()
+			# Ainu Client 2019
+			elif aobaHelper.getOsuVer(userID) in ["0Ainu", "b20190326.2", "b20190401.22f56c084ba339eefd9c7ca4335e246f80", "b20191223.3"]:
+				log.info("Account {} tried to use Ainu Client!".format(userID))
+				if userUtils.isRestricted(userID):
+					responseToken.enqueue(serverPackets.notification("You're banned because you're currently using Ainu Client. Enjoy your restriction :)"))
+				else:
+					glob.tokens.deleteToken(userID)
+					userUtils.restrict(userID)
+					raise exceptions.loginCheatClientsException()
+			# hqOsu
+			elif aobaHelper.getOsuVer(userID) == "b20190226.2":
+				log.info("Account {} tried to use hqOsu!".format(userID))
+				if userUtils.isRestricted(userID):
+					responseToken.enqueue(serverPackets.notification("Trying to use hqOsu in here? Well... No, sorry. We don't allow cheats here. Go play https://cookiezi.pw or others cheat server."))
+				else:
+					glob.tokens.deleteToken(userID)
+					userUtils.restrict(userID)
+					raise exceptions.loginCheatClientsException()
 
 		# Send all needed login packets
 		responseToken.enqueue(serverPackets.silenceEndTime(silenceSeconds))
@@ -239,6 +279,9 @@ def handle(tornadoRequest):
 	except exceptions.loginLockedException:
 		# Login banned error packet
 		responseData += serverPackets.loginLocked()
+	except exceptions.loginCheatClientsException:
+		# Banned for logging in with cheats
+		responseData += serverPackets.loginCheats()
 	except exceptions.banchoMaintenanceException:
 		# Bancho is in maintenance mode
 		responseData = bytes()

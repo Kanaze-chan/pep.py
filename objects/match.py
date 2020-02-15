@@ -82,6 +82,19 @@ class match:
 		glob.channels.addHiddenChannel("#multi_{}".format(self.matchID))
 		log.info("MPROOM{}: {} match created!".format(self.matchID, "Tourney" if self.isTourney else "Normal"))
 
+		# Create referrs array that couls use !mp command from the bot.
+		self.refers = [hostUserID]
+
+	def addRefer(self, referUserId):
+		self.refers.append(referUserId)
+
+	def removeRefer(self, referUserId):
+		if self.userRefersToMatch(referUserId):
+			self.refers.remove(referUserId)
+
+	def userRefersToMatch(self, referUserId):
+		return referUserId in self.refers
+
 	def getMatchData(self, censored = False):
 		"""
 		Return binary match data structure for packetHelper
