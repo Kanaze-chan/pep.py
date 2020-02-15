@@ -7,4 +7,10 @@ filters.txt
 redistest.py
 *.c
 *.so
+*.pyd
+*.html
+*.dll
+*.lib
+*.obj
+*.log
 .pyenv
